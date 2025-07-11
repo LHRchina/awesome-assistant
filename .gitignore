@@ -1,0 +1,15 @@
+# General
+.DS_Store
+.vscode/
+.idea/
+*.log
+*.tmp
+*.temp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Uploaded files (you may want to keep these)
+uploads/
