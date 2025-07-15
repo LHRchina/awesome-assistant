@@ -19,3 +19,9 @@ toml = "0.8"
 aws-config = "1.1.7"
 aws-sdk-s3 = "1.14.0"
 aws-smithy-types = "1.1.7"
+# Authentication and database dependencies
+jsonwebtoken = "9.2"
+reqwest = { version = "0.11", features = ["json"] }
+tokio-postgres = "0.7"
+actix-web-httpauth = "0.8"
+base64 = "0.21"

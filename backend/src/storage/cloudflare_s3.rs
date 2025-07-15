@@ -15,6 +15,21 @@ struct Config {
     cloudflare: CloudflareConfig,
 }
 
+#[derive(Debug)]
+pub enum StorageError {
+    BucketNotFound(String),
+    CredentialsInvalid,
+    NetworkError(String),
+    ConfigurationError(String),
+}
+
+fn validate_config(config: &CloudflareConfig) -> Result<(), Box<dyn std::error::Error>> {
+    if config.account_id.is_empty() || config.access_key_id.is_empty() || config.access_key_secret.is_empty() {
+        return Err("Missing required Cloudflare credentials".into());
+    }
+    Ok(())
+}
+
 /// Load configuration from TOML file
 fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
     let config_content = fs::read_to_string("src/conf/init.toml")?;
@@ -25,10 +40,12 @@ fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
 /// Create S3 client with Cloudflare R2 configuration
 async fn create_s3_client() -> Result<s3::Client, Box<dyn std::error::Error>> {
     let app_config = load_config()?;
-    
+
     let account_id = &app_config.cloudflare.account_id;
     let access_key_id = &app_config.cloudflare.access_key_id;
     let access_key_secret = &app_config.cloudflare.access_key_secret;
+    // print the account id and access key id
+    println!("account_id: {}, access_key_id: {}", account_id, access_key_id);
 
     // Configure the client
     let aws_config = aws_config::from_env()
@@ -50,7 +67,7 @@ async fn create_s3_client() -> Result<s3::Client, Box<dyn std::error::Error>> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bucket_name = "sdk-example";
-    
+
     let client = create_s3_client().await?;
 
     // List buckets

@@ -1,69 +1,95 @@
 <template>
   <div id="app">
     <div class="container">
-      <h1>File Upload System</h1>
-      
-      <!-- Upload Section -->
-      <div class="upload-section">
-        <h2>Upload Files</h2>
-        <div class="upload-area" @drop="handleDrop" @dragover.prevent @dragenter.prevent">
-          <input 
-            type="file" 
-            ref="fileInput" 
-            @change="handleFileSelect" 
-            multiple 
-            class="file-input"
-          />
-          <div class="upload-content">
-            <svg class="upload-icon" viewBox="0 0 24 24" width="48" height="48">
-              <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-            </svg>
-            <p>Drag and drop files here or click to select</p>
-            <button @click="$refs.fileInput.click()" class="select-btn">Select Files</button>
-          </div>
-        </div>
-        
-        <!-- Selected Files -->
-        <div v-if="selectedFiles.length > 0" class="selected-files">
-          <h3>Selected Files:</h3>
-          <div v-for="(file, index) in selectedFiles" :key="index" class="file-item">
-            <span>{{ file.name }} ({{ formatFileSize(file.size) }})</span>
-            <button @click="removeFile(index)" class="remove-btn">×</button>
-          </div>
-          <button @click="uploadFiles" :disabled="uploading" class="upload-btn">
-            {{ uploading ? 'Uploading...' : 'Upload Files' }}
-          </button>
-        </div>
-        
-        <!-- Upload Progress -->
-        <div v-if="uploading" class="progress-bar">
-          <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
-        </div>
+      <div class="header">
+        <h1>🚀 Awesome Assistant</h1>
+        <p>Secure File Upload with Google Authentication</p>
       </div>
-      
-      <!-- Files List Section -->
-      <div class="files-section">
-        <h2>Uploaded Files</h2>
-        <button @click="loadFiles" class="refresh-btn">Refresh</button>
-        
-        <div v-if="loading" class="loading">Loading files...</div>
-        
-        <div v-else-if="uploadedFiles.length === 0" class="no-files">
-          No files uploaded yet.
+
+      <!-- Login Section -->
+      <div v-if="!isAuthenticated" class="login-section">
+        <h2>Login Required</h2>
+        <p>Please sign in with your Google account to upload and manage files.</p>
+        <div id="google-signin-button"></div>
+        <div v-if="authError" class="error">{{ authError }}</div>
+        <div v-if="isLoading" class="loading">Signing in...</div>
+      </div>
+
+      <!-- Main App Section -->
+      <div v-else class="app-section">
+        <div class="user-info">
+          <h3>Welcome, {{ currentUser?.name }}!</h3>
+          <p>Email: {{ currentUser?.email }}</p>
+          <button @click="logout" class="btn btn-danger">Logout</button>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+          <h2>Upload Files</h2>
+          <div class="upload-area" @drop="handleDrop" @dragover.prevent @dragenter.prevent">
+            <input 
+              type="file" 
+              ref="fileInput" 
+              @change="handleFileSelect" 
+              multiple 
+              class="file-input"
+            />
+            <div class="upload-content">
+              <svg class="upload-icon" viewBox="0 0 24 24" width="48" height="48">
+                <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+              </svg>
+              <p>Drag and drop files here or click to select</p>
+              <button @click="$refs.fileInput.click()" class="select-btn">Select Files</button>
+            </div>
+          </div>
+          
+          <!-- Selected Files -->
+          <div v-if="selectedFiles.length > 0" class="selected-files">
+            <h3>Selected Files:</h3>
+            <div v-for="(file, index) in selectedFiles" :key="index" class="file-item">
+              <span>{{ file.name }} ({{ formatFileSize(file.size) }})</span>
+              <button @click="removeFile(index)" class="remove-btn">×</button>
+            </div>
+            <button @click="uploadFiles" :disabled="uploading" class="upload-btn">
+              {{ uploading ? 'Uploading...' : 'Upload Files' }}
+            </button>
+          </div>
+          
+          <!-- Upload Progress -->
+          <div v-if="uploading" class="progress-bar">
+            <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+          </div>
+          
+          <!-- Upload Status -->
+          <div v-if="uploadStatus" class="upload-status" :class="uploadStatusType">
+            {{ uploadStatus }}
+          </div>
         </div>
         
-        <div v-else class="files-grid">
-          <div v-for="file in uploadedFiles" :key="file.id" class="file-card">
-            <div class="file-info">
-              <h4>{{ file.filename }}</h4>
-              <p>Size: {{ formatFileSize(file.size) }}</p>
-              <p>Type: {{ file.content_type || 'Unknown' }}</p>
-              <p>Uploaded: {{ formatDate(file.upload_time) }}</p>
-            </div>
-            <div class="file-actions">
-              <button @click="downloadFile(file.id, file.filename)" class="download-btn">
-                Download
-              </button>
+        <!-- Files List Section -->
+        <div class="files-section">
+          <h2>Your Files</h2>
+          <button @click="loadFiles" class="refresh-btn">Refresh Files</button>
+          
+          <div v-if="loading" class="loading">Loading files...</div>
+          
+          <div v-else-if="uploadedFiles.length === 0" class="no-files">
+            No files uploaded yet.
+          </div>
+          
+          <div v-else class="files-grid">
+            <div v-for="file in uploadedFiles" :key="file.id" class="file-card">
+              <div class="file-info">
+                <h4>{{ file.filename }}</h4>
+                <p>Size: {{ formatFileSize(file.size) }}</p>
+                <p>Type: {{ file.content_type || 'Unknown' }}</p>
+                <p>Uploaded: {{ formatDate(file.upload_time) }}</p>
+              </div>
+              <div class="file-actions">
+                <button @click="downloadFile(file.id, file.filename)" class="download-btn">
+                  Download
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -73,49 +99,78 @@
 </template>
 
 <script>
+import { ref, onMounted, nextTick } from 'vue'
 import axios from 'axios'
+import { useAuth } from './composables/useAuth.js'
 
 const API_BASE_URL = 'http://localhost:8080'
 
 export default {
   name: 'App',
-  data() {
-    return {
-      selectedFiles: [],
-      uploadedFiles: [],
-      uploading: false,
-      loading: false,
-      uploadProgress: 0
-    }
-  },
-  mounted() {
-    this.loadFiles()
-  },
-  methods: {
-    handleFileSelect(event) {
+  setup() {
+    const {
+      authToken,
+      currentUser,
+      isAuthenticated,
+      isLoading,
+      authError,
+      initializeGoogleAuth,
+      checkAuthStatus,
+      logout,
+      renderGoogleSignIn
+    } = useAuth()
+
+    const selectedFiles = ref([])
+    const uploadedFiles = ref([])
+    const uploading = ref(false)
+    const loading = ref(false)
+    const uploadProgress = ref(0)
+    const uploadStatus = ref('')
+    const uploadStatusType = ref('')
+
+    onMounted(async () => {
+      await initializeGoogleAuth()
+      
+      if (authToken.value) {
+        await checkAuthStatus()
+      }
+      
+      if (isAuthenticated.value) {
+        loadFiles()
+      }
+      
+      // Render Google Sign-In button after component is mounted
+      nextTick(() => {
+        if (!isAuthenticated.value) {
+          renderGoogleSignIn('google-signin-button')
+        }
+      })
+    })
+  const handleFileSelect = (event) => {
       const files = Array.from(event.target.files)
-      this.selectedFiles = [...this.selectedFiles, ...files]
-    },
+      selectedFiles.value = [...selectedFiles.value, ...files]
+    }
     
-    handleDrop(event) {
+    const handleDrop = (event) => {
       event.preventDefault()
       const files = Array.from(event.dataTransfer.files)
-      this.selectedFiles = [...this.selectedFiles, ...files]
-    },
+      selectedFiles.value = [...selectedFiles.value, ...files]
+    }
     
-    removeFile(index) {
-      this.selectedFiles.splice(index, 1)
-    },
+    const removeFile = (index) => {
+      selectedFiles.value.splice(index, 1)
+    }
     
-    async uploadFiles() {
-      if (this.selectedFiles.length === 0) return
+    const uploadFiles = async () => {
+      if (selectedFiles.value.length === 0) return
       
-      this.uploading = true
-      this.uploadProgress = 0
+      uploading.value = true
+      uploadProgress.value = 0
+      uploadStatus.value = ''
       
       try {
-        for (let i = 0; i < this.selectedFiles.length; i++) {
-          const file = this.selectedFiles[i]
+        for (let i = 0; i < selectedFiles.value.length; i++) {
+          const file = selectedFiles.value[i]
           const formData = new FormData()
           formData.append('file', file)
           
@@ -125,39 +180,47 @@ export default {
             },
             onUploadProgress: (progressEvent) => {
               const progress = Math.round(
-                ((i + progressEvent.loaded / progressEvent.total) / this.selectedFiles.length) * 100
+                ((i + progressEvent.loaded / progressEvent.total) / selectedFiles.value.length) * 100
               )
-              this.uploadProgress = progress
+              uploadProgress.value = progress
             }
           })
         }
         
-        this.selectedFiles = []
-        this.loadFiles()
-        alert('Files uploaded successfully!')
+        selectedFiles.value = []
+        uploadStatus.value = 'Files uploaded successfully!'
+        uploadStatusType.value = 'success'
+        loadFiles()
       } catch (error) {
         console.error('Upload error:', error)
-        alert('Error uploading files. Please try again.')
+        uploadStatus.value = error.response?.data?.message || 'Error uploading files. Please try again.'
+        uploadStatusType.value = 'error'
       } finally {
-        this.uploading = false
-        this.uploadProgress = 0
+        uploading.value = false
+        uploadProgress.value = 0
+        setTimeout(() => {
+          uploadStatus.value = ''
+        }, 5000)
       }
-    },
+    }
     
-    async loadFiles() {
-      this.loading = true
+    const loadFiles = async () => {
+      if (!isAuthenticated.value) return
+      
+      loading.value = true
       try {
         const response = await axios.get(`${API_BASE_URL}/files`)
-        this.uploadedFiles = response.data.files
+        uploadedFiles.value = response.data.files || []
       } catch (error) {
         console.error('Error loading files:', error)
-        alert('Error loading files. Please check if the server is running.')
+        uploadStatus.value = 'Error loading files. Please try again.'
+        uploadStatusType.value = 'error'
       } finally {
-        this.loading = false
+        loading.value = false
       }
-    },
+    }
     
-    async downloadFile(fileId, filename) {
+    const downloadFile = async (fileId, filename) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/download/${fileId}`, {
           responseType: 'blob'
@@ -173,20 +236,50 @@ export default {
         window.URL.revokeObjectURL(url)
       } catch (error) {
         console.error('Download error:', error)
-        alert('Error downloading file.')
+        uploadStatus.value = 'Error downloading file.'
+        uploadStatusType.value = 'error'
       }
-    },
+    }
     
-    formatFileSize(bytes) {
+    const formatFileSize = (bytes) => {
       if (bytes === 0) return '0 Bytes'
       const k = 1024
       const sizes = ['Bytes', 'KB', 'MB', 'GB']
       const i = Math.floor(Math.log(bytes) / Math.log(k))
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-    },
+    }
     
-    formatDate(dateString) {
+    const formatDate = (dateString) => {
       return new Date(dateString).toLocaleString()
+    }
+
+    return {
+      // Auth state
+      authToken,
+      currentUser,
+      isAuthenticated,
+      isLoading,
+      authError,
+      logout,
+      
+      // App state
+      selectedFiles,
+      uploadedFiles,
+      uploading,
+      loading,
+      uploadProgress,
+      uploadStatus,
+      uploadStatusType,
+      
+      // Methods
+      handleFileSelect,
+      handleDrop,
+      removeFile,
+      uploadFiles,
+      loadFiles,
+      downloadFile,
+      formatFileSize,
+      formatDate
     }
   }
 }
@@ -200,35 +293,170 @@ export default {
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: #f5f5f5;
 }
 
-.container {
-  max-width: 1200px;
+#app {
+  max-width: 800px;
   margin: 0 auto;
   padding: 20px;
 }
 
-h1 {
+.container {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.header {
   text-align: center;
-  color: #333;
   margin-bottom: 30px;
+}
+
+.header h1 {
+  color: #333;
+  margin-bottom: 10px;
   font-size: 2.5rem;
 }
 
-h2 {
-  color: #444;
-  margin-bottom: 20px;
+.header p {
+  color: #666;
+  font-size: 16px;
+}
+
+/* Authentication Styles */
+.login-section {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.login-section h2 {
+  margin-bottom: 15px;
+  color: #333;
   font-size: 1.8rem;
 }
 
+.login-section p {
+  margin-bottom: 20px;
+  color: #666;
+}
+
+#google-signin-button {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.user-info {
+  background: #e7f3ff;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.user-info h3 {
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.user-info p {
+  margin-bottom: 10px;
+  color: #666;
+}
+
+/* Button Styles */
+.btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 5px;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn:hover {
+  background: #0056b3;
+}
+
+.btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: #dc3545;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
+/* Status Messages */
+.error {
+  color: #dc3545;
+  margin: 10px 0;
+  padding: 10px;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+}
+
+.success {
+  color: #155724;
+  margin: 10px 0;
+  padding: 10px;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+}
+
+.loading {
+  color: #007bff;
+  margin: 10px 0;
+  text-align: center;
+  font-size: 1.1rem;
+  padding: 20px;
+}
+
+.upload-status {
+  margin: 15px 0;
+  padding: 10px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.upload-status.success {
+  color: #155724;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.upload-status.error {
+  color: #721c24;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+}
+
+/* Upload Section */
 .upload-section, .files-section {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  margin-bottom: 30px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.upload-section h2, .files-section h2 {
+  color: #444;
+  margin-bottom: 20px;
+  font-size: 1.8rem;
 }
 
 .upload-area {
@@ -365,7 +593,7 @@ h2 {
   margin-bottom: 20px;
 }
 
-.loading, .no-files {
+.no-files {
   text-align: center;
   color: #666;
   font-size: 1.1rem;
@@ -423,19 +651,23 @@ h2 {
 }
 
 @media (max-width: 768px) {
-  .container {
+  #app {
     padding: 10px;
   }
   
-  .upload-section, .files-section {
+  .container {
     padding: 20px;
+  }
+  
+  .upload-section, .files-section {
+    padding: 15px;
   }
   
   .files-grid {
     grid-template-columns: 1fr;
   }
   
-  h1 {
+  .header h1 {
     font-size: 2rem;
   }
 }
