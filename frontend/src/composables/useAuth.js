@@ -1,7 +1,7 @@
 import { ref, reactive } from 'vue'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://dochelp.pro/api'
 
 // Global auth state
 const authToken = ref(localStorage.getItem('authToken'))

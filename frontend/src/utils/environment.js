@@ -7,7 +7,7 @@ export const isProduction = () => import.meta.env.PROD
 
 export const getApiUrl = () => {
   if (isLocal()) {
-    return import.meta.env.VITE_API_BASE_URL || '/api'
+    return import.meta.env.VITE_API_BASE_URL || 'https://dochelp.pro/api'
   }
-  return '/api' // Use relative URL for production
+  return 'https://dochelp.pro/api' // Use relative URL for production
 }
