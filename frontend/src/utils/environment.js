@@ -7,7 +7,7 @@ export const isProduction = () => import.meta.env.PROD
 
 export const getApiUrl = () => {
   if (isLocal()) {
-    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+    return import.meta.env.VITE_API_BASE_URL || '/api'
   }
   return '/api' // Use relative URL for production
 }
