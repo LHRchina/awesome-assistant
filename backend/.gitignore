@@ -25,4 +25,5 @@ uploads/
 
 # Rust analyzer cache
 .rust-analyzer/
+conf/init.toml
 src/conf/init.toml

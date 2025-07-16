@@ -10,8 +10,10 @@ use actix_web::http::header::ContentType;
 
 mod storage;
 mod auth;
+mod conf;
 use storage::{CloudflareStorage, FileMetadata};
 use auth::{AuthService, Claims, login, me};
+use conf::load_config;
 
 fn get_current_time() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -229,8 +231,11 @@ async fn main() -> std::io::Result<()> {
 
     println!("Initializing Cloudflare R2 storage...");
 
+    // Load configuration
+    let config = load_config().expect("Failed to load configuration");
+
     // Initialize CloudflareStorage
-    let storage = CloudflareStorage::new("awesome-assistant".to_string())
+    let storage = CloudflareStorage::new(config.cloudflare.bucket_name.clone())
         .await
         .map_err(|e| {
             eprintln!("Failed to initialize Cloudflare storage: {}", e);
@@ -238,8 +243,8 @@ async fn main() -> std::io::Result<()> {
         })?;
 
     // Initialize AuthService
-    let database_url = "postgresql://awesome:mysecretpassword-awesome-assistant@127.0.0.1:5432/awesome";
-    let jwt_secret = "your-super-secret-jwt-key-here-make-it-long-and-random";
+    let database_url = &config.postgres.postgres_url;
+    let jwt_secret = &config.backend.jwt_secret;
     let auth_service = AuthService::new(database_url, jwt_secret).await.expect("Failed to connect to database");
 
     // Create application state

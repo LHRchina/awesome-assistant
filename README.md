@@ -129,7 +129,7 @@ awesome-assistant/
 ```bash
 cd backend
 cargo build --release
-./target/release/file-upload-backend
+./target/release/awesome-api-backend
 ```
 
 ### Frontend

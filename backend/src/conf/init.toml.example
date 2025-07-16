@@ -1,0 +1,9 @@
+[cloudflare]
+account_id = "your-cloudflare-account-id"
+access_key_id = "your-cloudflare-access-key-id"
+access_key_secret = "your-cloudflare-access-key-secret"
+bucket_name = "your-bucket-name"
+[postgres]
+postgres_url = "postgresql://username:password@localhost:5432/database_name"
+[backend]
+jwt_secret = "your-super-secret-jwt-key-here-make-it-long-and-random"

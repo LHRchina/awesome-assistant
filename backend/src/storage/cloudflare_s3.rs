@@ -1,19 +1,6 @@
 use aws_sdk_s3 as s3;
 use aws_smithy_types::date_time::Format::DateTime;
-use serde::Deserialize;
-use std::fs;
-
-#[derive(Deserialize)]
-struct CloudflareConfig {
-    account_id: String,
-    access_key_id: String,
-    access_key_secret: String,
-}
-
-#[derive(Deserialize)]
-struct Config {
-    cloudflare: CloudflareConfig,
-}
+use crate::conf::{load_config, validate_config};
 
 #[derive(Debug)]
 pub enum StorageError {
@@ -23,22 +10,8 @@ pub enum StorageError {
     ConfigurationError(String),
 }
 
-fn validate_config(config: &CloudflareConfig) -> Result<(), Box<dyn std::error::Error>> {
-    if config.account_id.is_empty() || config.access_key_id.is_empty() || config.access_key_secret.is_empty() {
-        return Err("Missing required Cloudflare credentials".into());
-    }
-    Ok(())
-}
-
-/// Load configuration from TOML file
-fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
-    let config_content = fs::read_to_string("src/conf/init.toml")?;
-    let config: Config = toml::from_str(&config_content)?;
-    Ok(config)
-}
-
 /// Create S3 client with Cloudflare R2 configuration
-async fn create_s3_client() -> Result<s3::Client, Box<dyn std::error::Error>> {
+pub async fn create_s3_client() -> Result<s3::Client, Box<dyn std::error::Error>> {
     let app_config = load_config()?;
 
     let account_id = &app_config.cloudflare.account_id;
