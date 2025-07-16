@@ -27,11 +27,11 @@
         <div class="upload-section">
           <h2>Upload Files</h2>
           <div class="upload-area" @drop="handleDrop" @dragover.prevent @dragenter.prevent">
-            <input 
-              type="file" 
-              ref="fileInput" 
-              @change="handleFileSelect" 
-              multiple 
+            <input
+              type="file"
+              ref="fileInput"
+              @change="handleFileSelect"
+              multiple
               class="file-input"
             />
             <div class="upload-content">
@@ -42,7 +42,7 @@
               <button @click="$refs.fileInput.click()" class="select-btn">Select Files</button>
             </div>
           </div>
-          
+
           <!-- Selected Files -->
           <div v-if="selectedFiles.length > 0" class="selected-files">
             <h3>Selected Files:</h3>
@@ -54,29 +54,29 @@
               {{ uploading ? 'Uploading...' : 'Upload Files' }}
             </button>
           </div>
-          
+
           <!-- Upload Progress -->
           <div v-if="uploading" class="progress-bar">
             <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
           </div>
-          
+
           <!-- Upload Status -->
           <div v-if="uploadStatus" class="upload-status" :class="uploadStatusType">
             {{ uploadStatus }}
           </div>
         </div>
-        
+
         <!-- Files List Section -->
         <div class="files-section">
           <h2>Your Files</h2>
           <button @click="loadFiles" class="refresh-btn">Refresh Files</button>
-          
+
           <div v-if="loading" class="loading">Loading files...</div>
-          
+
           <div v-else-if="uploadedFiles.length === 0" class="no-files">
             No files uploaded yet.
           </div>
-          
+
           <div v-else class="files-grid">
             <div v-for="file in uploadedFiles" :key="file.id" class="file-card">
               <div class="file-info">
@@ -103,7 +103,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import axios from 'axios'
 import { useAuth } from './composables/useAuth.js'
 
-const API_BASE_URL = 'http://localhost:8080'
+const API_BASE_URL = 'http://localhost:8080/api'
 
 export default {
   name: 'App',
@@ -130,15 +130,15 @@ export default {
 
     onMounted(async () => {
       await initializeGoogleAuth()
-      
+
       if (authToken.value) {
         await checkAuthStatus()
       }
-      
+
       if (isAuthenticated.value) {
         loadFiles()
       }
-      
+
       // Render Google Sign-In button after component is mounted
       nextTick(() => {
         if (!isAuthenticated.value) {
@@ -150,30 +150,30 @@ export default {
       const files = Array.from(event.target.files)
       selectedFiles.value = [...selectedFiles.value, ...files]
     }
-    
+
     const handleDrop = (event) => {
       event.preventDefault()
       const files = Array.from(event.dataTransfer.files)
       selectedFiles.value = [...selectedFiles.value, ...files]
     }
-    
+
     const removeFile = (index) => {
       selectedFiles.value.splice(index, 1)
     }
-    
+
     const uploadFiles = async () => {
       if (selectedFiles.value.length === 0) return
-      
+
       uploading.value = true
       uploadProgress.value = 0
       uploadStatus.value = ''
-      
+
       try {
         for (let i = 0; i < selectedFiles.value.length; i++) {
           const file = selectedFiles.value[i]
           const formData = new FormData()
           formData.append('file', file)
-          
+
           await axios.post(`${API_BASE_URL}/upload`, formData, {
             headers: {
               'Content-Type': 'multipart/form-data'
@@ -186,7 +186,7 @@ export default {
             }
           })
         }
-        
+
         selectedFiles.value = []
         uploadStatus.value = 'Files uploaded successfully!'
         uploadStatusType.value = 'success'
@@ -203,10 +203,10 @@ export default {
         }, 5000)
       }
     }
-    
+
     const loadFiles = async () => {
       if (!isAuthenticated.value) return
-      
+
       loading.value = true
       try {
         const response = await axios.get(`${API_BASE_URL}/files`)
@@ -219,13 +219,13 @@ export default {
         loading.value = false
       }
     }
-    
+
     const downloadFile = async (fileId, filename) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/download/${fileId}`, {
           responseType: 'blob'
         })
-        
+
         const url = window.URL.createObjectURL(new Blob([response.data]))
         const link = document.createElement('a')
         link.href = url
@@ -240,7 +240,7 @@ export default {
         uploadStatusType.value = 'error'
       }
     }
-    
+
     const formatFileSize = (bytes) => {
       if (bytes === 0) return '0 Bytes'
       const k = 1024
@@ -248,7 +248,7 @@ export default {
       const i = Math.floor(Math.log(bytes) / Math.log(k))
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
     }
-    
+
     const formatDate = (dateString) => {
       return new Date(dateString).toLocaleString()
     }
@@ -261,7 +261,7 @@ export default {
       isLoading,
       authError,
       logout,
-      
+
       // App state
       selectedFiles,
       uploadedFiles,
@@ -270,7 +270,7 @@ export default {
       uploadProgress,
       uploadStatus,
       uploadStatusType,
-      
+
       // Methods
       handleFileSelect,
       handleDrop,
@@ -654,19 +654,19 @@ body {
   #app {
     padding: 10px;
   }
-  
+
   .container {
     padding: 20px;
   }
-  
+
   .upload-section, .files-section {
     padding: 15px;
   }
-  
+
   .files-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .header h1 {
     font-size: 2rem;
   }

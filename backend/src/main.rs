@@ -131,7 +131,7 @@ async fn list_files(
         Ok(rows) => {
             let metadata_store = data.file_metadata.lock().await;
             let mut user_files = Vec::new();
-            
+
             for row in rows {
                 let file_key: String = row.get(0);
                 // Find matching file in memory store by s3_key
@@ -142,7 +142,7 @@ async fn list_files(
                     }
                 }
             }
-            
+
             Ok(HttpResponse::Ok().json(FilesListResponse { files: user_files }))
         }
         Err(e) => {
@@ -223,14 +223,6 @@ async fn download_file(
     }))
 }
 
-// Serve the static HTML file
-async fn serve_index() -> Result<HttpResponse> {
-    let html_content = include_str!("../static/index.html");
-    Ok(HttpResponse::Ok()
-        .content_type(ContentType::html())
-        .body(html_content))
-}
-
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
@@ -255,7 +247,7 @@ async fn main() -> std::io::Result<()> {
         storage,
         file_metadata: Arc::new(Mutex::new(HashMap::new())),
     });
-    
+
     let auth_service_data = web::Data::new(auth_service);
 
     println!("Starting file upload server on http://localhost:8080");
@@ -272,14 +264,14 @@ async fn main() -> std::io::Result<()> {
             .app_data(auth_service_data.clone())
             .wrap(cors)
             .wrap(Logger::default())
-            // Public routes (no authentication required)
-            .route("/", web::get().to(serve_index))
-            .route("/login", web::post().to(login))
-            // Protected routes (authentication required)
-            .route("/upload", web::post().to(upload_file))
-            .route("/files", web::get().to(list_files))
-            .route("/download/{id}", web::get().to(download_file))
-            .route("/me", web::get().to(me))
+            .service(
+                web::scope("/api")
+                    .route("/login", web::post().to(login))
+                    .route("/upload", web::post().to(upload_file))
+                    .route("/files", web::get().to(list_files))
+                    .route("/download/{id}", web::get().to(download_file))
+                    .route("/me", web::get().to(me))
+            )
     })
     .bind("127.0.0.1:8080")?
     .run()

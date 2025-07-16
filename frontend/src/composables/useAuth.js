@@ -1,7 +1,7 @@
 import { ref, reactive } from 'vue'
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8080'
+const API_BASE_URL = 'http://localhost:8080/api'
 
 // Global auth state
 const authToken = ref(localStorage.getItem('authToken'))
@@ -36,7 +36,7 @@ export function useAuth() {
         resolve()
         return
       }
-      
+
       const script = document.createElement('script')
       script.src = 'https://accounts.google.com/gsi/client'
       script.async = true
@@ -52,11 +52,11 @@ export function useAuth() {
     try {
       isLoading.value = true
       authError.value = ''
-      
+
       const result = await axios.post(`${API_BASE_URL}/login`, {
         google_token: response.credential
       })
-      
+
       if (result.data.success) {
         authToken.value = result.data.token
         currentUser.value = result.data.user
@@ -75,7 +75,7 @@ export function useAuth() {
 
   const checkAuthStatus = async () => {
     if (!authToken.value) return
-    
+
     try {
       isLoading.value = true
       const response = await axios.get(`${API_BASE_URL}/me`)
@@ -103,10 +103,10 @@ export function useAuth() {
         client_id: '859163330769-g2gcui5tun3i6pampo2o1ei8penl5mat.apps.googleusercontent.com',
         callback: handleCredentialResponse
       })
-      
+
       window.google.accounts.id.renderButton(
         document.getElementById(elementId),
-        { 
+        {
           type: 'standard',
           theme: 'outline',
           size: 'large',
@@ -123,7 +123,7 @@ export function useAuth() {
     isAuthenticated,
     isLoading,
     authError,
-    
+
     // Methods
     initializeGoogleAuth,
     handleCredentialResponse,
