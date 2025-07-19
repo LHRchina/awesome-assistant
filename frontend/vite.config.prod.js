@@ -9,7 +9,7 @@ export default defineConfig({
         manualChunks: undefined
       }
     },
-    minify: 'terser',
+    minify: 'esbuild',
     sourcemap: false
   },
   define: {
