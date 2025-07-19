@@ -95,6 +95,8 @@ export function useAuth() {
     isAuthenticated.value = false
     authError.value = ''
     localStorage.removeItem('authToken')
+    // Refresh the page after logout
+    window.location.reload()
   }
 
   const renderGoogleSignIn = (elementId) => {

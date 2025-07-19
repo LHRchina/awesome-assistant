@@ -99,7 +99,7 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import axios from 'axios'
 import { useAuth } from './composables/useAuth.js'
 
@@ -145,6 +145,13 @@ export default {
           renderGoogleSignIn('google-signin-button')
         }
       })
+    })
+
+    // Watch for authentication state changes and load files when user logs in
+    watch(isAuthenticated, (newValue) => {
+      if (newValue) {
+        loadFiles()
+      }
     })
   const handleFileSelect = (event) => {
       const files = Array.from(event.target.files)
