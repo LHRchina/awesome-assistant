@@ -3,24 +3,21 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  server: {
-    port: 5173,
-    host: true,
-    open: false,
-    allowedHosts: ['dochelp.pro', 'localhost', '127.0.0.1'],
-    hmr: {
-      port: 5173,
-      host: 'localhost'
-    }
-  },
   build: {
     rollupOptions: {
       output: {
         manualChunks: undefined
       }
-    }
+    },
+    minify: 'terser',
+    sourcemap: false
   },
   define: {
-    __VUE_PROD_DEVTOOLS__: false
+    __VUE_PROD_DEVTOOLS__: false,
+    'process.env.NODE_ENV': '"production"'
+  },
+  // Disable HMR for production
+  server: {
+    hmr: false
   }
 })
