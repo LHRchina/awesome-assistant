@@ -3,9 +3,8 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::future::{Ready, ready};
 use tokio_postgres::{NoTls, Row};
+use crate::storage::redis_token_store::{RedisTokenStore, TokenInfo};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -49,10 +48,11 @@ pub struct AuthService {
     database_url: String,
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
+    token_store: RedisTokenStore,
 }
 
 impl AuthService {
-    pub async fn new(database_url: &str, jwt_secret: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(database_url: &str, jwt_secret: &str, redis_url: &str, token_ttl_seconds: u64) -> Result<Self, Box<dyn std::error::Error>> {
         let encoding_key = EncodingKey::from_secret(jwt_secret.as_ref());
         let decoding_key = DecodingKey::from_secret(jwt_secret.as_ref());
         
@@ -63,12 +63,15 @@ impl AuthService {
                 eprintln!("Database connection error: {}", e);
             }
         });
+
+        let token_store = RedisTokenStore::new(redis_url, token_ttl_seconds).await?;
         
         Ok(Self {
             db_client: client,
             database_url: database_url.to_string(),
             encoding_key,
             decoding_key,
+            token_store,
         })
     }
     
@@ -129,8 +132,9 @@ impl AuthService {
         }
     }
 
-    pub fn generate_jwt(&self, user: &User) -> Result<String, Box<dyn std::error::Error>> {
-        let expiration = Utc::now()
+    pub async fn generate_jwt(&self, user: &User) -> Result<String, Box<dyn std::error::Error>> {
+        let now = Utc::now();
+        let expiration = now
             .checked_add_signed(Duration::hours(24))
             .expect("valid timestamp")
             .timestamp();
@@ -148,10 +152,27 @@ impl AuthService {
             &self.encoding_key,
         )?;
 
+        // Store token in Redis
+        let token_info = TokenInfo {
+            user_id: user.id,
+            email: user.email.clone(),
+            name: user.name.clone(),
+            created_at: now.timestamp(),
+            expires_at: expiration,
+        };
+
+        self.token_store.store_token(&token, &token_info).await?;
+
         Ok(token)
     }
 
-    pub fn verify_jwt(&self, token: &str) -> Result<Claims, Box<dyn std::error::Error>> {
+    pub async fn verify_jwt(&self, token: &str) -> Result<Claims, Box<dyn std::error::Error>> {
+        // First check if token exists in Redis
+        let token_info = self.token_store.get_token_info(token).await?;
+        if token_info.is_none() {
+            return Err("Token not found or expired".into());
+        }
+
         let token_data = decode::<Claims>(
             token,
             &self.decoding_key,
@@ -159,6 +180,16 @@ impl AuthService {
         )?;
 
         Ok(token_data.claims)
+    }
+
+    pub async fn invalidate_token(&self, token: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.token_store.invalidate_token(token).await?;
+        Ok(())
+    }
+
+    pub async fn invalidate_all_user_tokens(&self, user_id: i64) -> Result<(), Box<dyn std::error::Error>> {
+        self.token_store.invalidate_all_user_tokens(user_id).await?;
+        Ok(())
     }
 
     pub async fn get_user_by_id(&self, user_id: i64) -> Result<Option<User>, Box<dyn std::error::Error>> {
@@ -179,52 +210,54 @@ impl AuthService {
     }
 }
 
-// Custom extractor for authentication
+// Custom extractor for authentication - updated to use async verification
 impl FromRequest for Claims {
     type Error = actix_web::Error;
-    type Future = Ready<Result<Self, Self::Error>>;
+    type Future = futures_util::future::LocalBoxFuture<'static, Result<Self, Self::Error>>;
 
     fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
-        let auth_header = req.headers().get("Authorization");
+        let req = req.clone();
         
-        let token = match auth_header {
-            Some(header_value) => {
-                match header_value.to_str() {
-                    Ok(header_str) => {
-                        if header_str.starts_with("Bearer ") {
-                            &header_str[7..]
-                        } else {
-                            return ready(Err(actix_web::error::ErrorUnauthorized("Invalid authorization header format")));
+        Box::pin(async move {
+            let auth_header = req.headers().get("Authorization");
+            
+            let token = match auth_header {
+                Some(header_value) => {
+                    match header_value.to_str() {
+                        Ok(header_str) => {
+                            if header_str.starts_with("Bearer ") {
+                                &header_str[7..]
+                            } else {
+                                return Err(actix_web::error::ErrorUnauthorized("Invalid authorization header format"));
+                            }
+                        }
+                        Err(_) => {
+                            return Err(actix_web::error::ErrorUnauthorized("Invalid authorization header"));
                         }
                     }
-                    Err(_) => {
-                        return ready(Err(actix_web::error::ErrorUnauthorized("Invalid authorization header")));
-                    }
+                }
+                None => {
+                    return Err(actix_web::error::ErrorUnauthorized("Missing authorization header"));
+                }
+            };
+
+            // Get auth service from app data
+            let auth_service = match req.app_data::<web::Data<AuthService>>() {
+                Some(service) => service,
+                None => {
+                    return Err(actix_web::error::ErrorInternalServerError("Auth service not found"));
+                }
+            };
+
+            match auth_service.verify_jwt(token).await {
+                Ok(claims) => {
+                    Ok(claims)
+                }
+                Err(_) => {
+                    Err(actix_web::error::ErrorUnauthorized("Invalid token"))
                 }
             }
-            None => {
-                return ready(Err(actix_web::error::ErrorUnauthorized("Missing authorization header")));
-            }
-        };
-
-        // Get auth service from app data
-        let auth_service = match req.app_data::<web::Data<AuthService>>() {
-            Some(service) => service,
-            None => {
-                return ready(Err(actix_web::error::ErrorInternalServerError("Auth service not found")));
-            }
-        };
-
-        match auth_service.verify_jwt(token) {
-            Ok(claims) => {
-                // Note: We can't do async operations in FromRequest, so we'll skip the user existence check here
-                // The user existence should be validated at the application level if needed
-                ready(Ok(claims))
-            }
-            Err(_) => {
-                ready(Err(actix_web::error::ErrorUnauthorized("Invalid token")))
-            }
-        }
+        })
     }
 }
 
@@ -237,7 +270,7 @@ pub async fn login(
         Ok(google_info) => {
             match auth_service.find_or_create_user(&google_info).await {
                 Ok(user) => {
-                    match auth_service.generate_jwt(&user) {
+                    match auth_service.generate_jwt(&user).await {
                         Ok(token) => {
                             Ok(HttpResponse::Ok().json(LoginResponse {
                                 success: true,
@@ -306,6 +339,67 @@ pub async fn me(
             Ok(HttpResponse::InternalServerError().json(LoginResponse {
                 success: false,
                 message: "Database error".to_string(),
+                token: None,
+                user: None,
+            }))
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LogoutRequest {
+    pub token: String,
+}
+
+// Logout endpoint
+pub async fn logout(
+    logout_req: web::Json<LogoutRequest>,
+    auth_service: web::Data<AuthService>,
+) -> Result<HttpResponse> {
+    match auth_service.invalidate_token(&logout_req.token).await {
+        Ok(_) => {
+            Ok(HttpResponse::Ok().json(LoginResponse {
+                success: true,
+                message: "Logged out successfully".to_string(),
+                token: None,
+                user: None,
+            }))
+        }
+        Err(e) => {
+            eprintln!("Logout error: {}", e);
+            Ok(HttpResponse::InternalServerError().json(LoginResponse {
+                success: false,
+                message: "Failed to logout".to_string(),
+                token: None,
+                user: None,
+            }))
+        }
+    }
+}
+
+// Logout all sessions endpoint
+pub async fn logout_all(
+    claims: Claims,
+    auth_service: web::Data<AuthService>,
+) -> Result<HttpResponse> {
+    let user_id: i64 = claims.sub.parse().map_err(|_| {
+        actix_web::error::ErrorBadRequest("Invalid user ID")
+    })?;
+    
+    match auth_service.invalidate_all_user_tokens(user_id).await {
+        Ok(_) => {
+            Ok(HttpResponse::Ok().json(LoginResponse {
+                success: true,
+                message: "Logged out from all sessions".to_string(),
+                token: None,
+                user: None,
+            }))
+        }
+        Err(e) => {
+            eprintln!("Logout all error: {}", e);
+            Ok(HttpResponse::InternalServerError().json(LoginResponse {
+                success: false,
+                message: "Failed to logout from all sessions".to_string(),
                 token: None,
                 user: None,
             }))

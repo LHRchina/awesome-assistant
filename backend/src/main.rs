@@ -12,7 +12,7 @@ mod storage;
 mod auth;
 mod conf;
 use storage::{CloudflareStorage, FileMetadata};
-use auth::{AuthService, Claims, login, me};
+use auth::{AuthService, Claims, login, me, logout, logout_all};
 use conf::load_config;
 
 fn get_current_time() -> String {
@@ -245,7 +245,9 @@ async fn main() -> std::io::Result<()> {
     // Initialize AuthService
     let database_url = &config.postgres.postgres_url;
     let jwt_secret = &config.backend.jwt_secret;
-    let auth_service = AuthService::new(database_url, jwt_secret).await.expect("Failed to connect to database");
+    let redis_url = &config.redis.redis_url;
+    let token_ttl_seconds = config.redis.token_ttl_seconds;
+    let auth_service = AuthService::new(database_url, jwt_secret, redis_url, token_ttl_seconds).await.expect("Failed to connect to database");
 
     // Create application state
     let app_state = web::Data::new(AppState {
@@ -272,6 +274,8 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/api")
                     .route("/login", web::post().to(login))
+                    .route("/logout", web::post().to(logout))
+                    .route("/logout_all", web::post().to(logout_all))
                     .route("/upload", web::post().to(upload_file))
                     .route("/files", web::get().to(list_files))
                     .route("/download/{id}", web::get().to(download_file))

@@ -1,4 +1,5 @@
 pub mod cloudflare_s3;
+pub mod redis_token_store;
 
 use aws_sdk_s3 as s3;
 use serde::{Deserialize, Serialize};

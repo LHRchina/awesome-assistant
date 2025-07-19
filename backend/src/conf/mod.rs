@@ -20,10 +20,17 @@ pub struct BackendConfig {
 }
 
 #[derive(Deserialize)]
+pub struct RedisConfig {
+    pub redis_url: String,
+    pub token_ttl_seconds: u64,
+}
+
+#[derive(Deserialize)]
 pub struct Config {
     pub cloudflare: CloudflareConfig,
     pub postgres: PostgresConfig,
     pub backend: BackendConfig,
+    pub redis: RedisConfig,
 }
 
 /// Load configuration from TOML file
